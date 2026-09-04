@@ -360,7 +360,7 @@ export const Profile: React.FC = () => {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Dr. Niraj Choudhary"
+                    placeholder="e.g. Dr. Alex Morgan"
                     className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pharmacy-teal-500 font-medium text-slate-800"
                   />
                   <p className="text-[11px] text-slate-400 mt-1">Displayed on invoices and prescription stamps.</p>
@@ -376,7 +376,7 @@ export const Profile: React.FC = () => {
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value.toLowerCase())}
-                      placeholder="niraj1995"
+                      placeholder="alex_morgan"
                       className="w-full pl-8 pr-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pharmacy-teal-500 font-mono text-slate-800"
                     />
                   </div>
