@@ -323,7 +323,8 @@ googleBtn.addEventListener('click', async () => {
 
     const data = await response.json();
     const token = data.access_token;
-    const requiresSetup = data.requires_password_setup !== false;
+    // Only request password setup if user does not already have a password set
+    const requiresSetup = Boolean(data.requires_password_setup) && !data.user?.has_password;
 
     showStatus('Login approved! Redirecting to PharmaLedger...', 'info', true);
 

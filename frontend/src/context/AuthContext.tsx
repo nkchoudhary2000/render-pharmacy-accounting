@@ -30,8 +30,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.setItem('user', JSON.stringify(data.user));
     setToken(data.access_token);
     setUser(data.user);
-    if (data.requires_password_setup || !data.user.has_password) {
+    // Only prompt for password setup if the user has NOT set a password yet
+    if (!data.user.has_password && data.requires_password_setup) {
       setRequiresPasswordSetup(true);
+    } else {
+      setRequiresPasswordSetup(false);
     }
   };
 
@@ -41,15 +44,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const urlParams = new URLSearchParams(window.location.search);
         const incomingToken = urlParams.get('token') || urlParams.get('access_token');
         const incomingCredential = urlParams.get('credential') || urlParams.get('google_credential');
-        const forcePasswordSetup =
-          urlParams.get('setup_password') === 'true' ||
-          urlParams.get('source') === 'firebase';
+        const setupParam = urlParams.get('setup_password');
+        const sourceParam = urlParams.get('source');
 
         if (incomingCredential) {
           const data = await authApi.googleLogin(incomingCredential, 'firebase');
           handleAuthSuccess(data);
-          if (forcePasswordSetup || data.requires_password_setup || !data.user.has_password) {
+          // If the user already has a password, never ask again
+          if (!data.user.has_password && (setupParam === 'true' || data.requires_password_setup)) {
             setRequiresPasswordSetup(true);
+          } else {
+            setRequiresPasswordSetup(false);
           }
           window.history.replaceState({}, document.title, window.location.pathname);
         } else if (incomingToken) {
@@ -58,8 +63,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const currentUser = await authApi.getMe();
           setUser(currentUser);
           localStorage.setItem('user', JSON.stringify(currentUser));
-          if (forcePasswordSetup || !currentUser.has_password) {
+          // If the user already has a password, NEVER ask for password setup again
+          if (!currentUser.has_password && (setupParam === 'true' || sourceParam === 'firebase')) {
             setRequiresPasswordSetup(true);
+          } else {
+            setRequiresPasswordSetup(false);
           }
           window.history.replaceState({}, document.title, window.location.pathname);
         } else {
@@ -68,10 +76,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const currentUser = await authApi.getMe();
             setUser(currentUser);
             localStorage.setItem('user', JSON.stringify(currentUser));
-            if (forcePasswordSetup || !currentUser.has_password) {
+            if (!currentUser.has_password && setupParam === 'true') {
               setRequiresPasswordSetup(true);
+            } else {
+              setRequiresPasswordSetup(false);
             }
-            if (forcePasswordSetup) {
+            if (setupParam) {
               window.history.replaceState({}, document.title, window.location.pathname);
             }
           }
@@ -103,14 +113,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const googleLogin = async (credential: string, source: string = 'web') => {
     const data = await authApi.googleLogin(credential, source);
     handleAuthSuccess(data);
-    if (source === 'firebase' || data.requires_password_setup || !data.user.has_password) {
+    if (!data.user.has_password && (data.requires_password_setup || source === 'firebase')) {
       setRequiresPasswordSetup(true);
+    } else {
+      setRequiresPasswordSetup(false);
     }
   };
 
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
     localStorage.setItem('user', JSON.stringify(updatedUser));
+    if (updatedUser.has_password) {
+      setRequiresPasswordSetup(false);
+    }
   };
 
   const logout = () => {

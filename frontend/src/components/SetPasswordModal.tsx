@@ -12,7 +12,7 @@ export const SetPasswordModal: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!requiresPasswordSetup || !user) {
+  if (!requiresPasswordSetup || !user || user.has_password) {
     return null;
   }
 
