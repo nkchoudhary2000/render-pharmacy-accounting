@@ -30,6 +30,7 @@ export interface AuthResponse {
   access_token: string;
   token_type: string;
   user: User;
+  requires_password_setup?: boolean;
 }
 
 export interface Patient {

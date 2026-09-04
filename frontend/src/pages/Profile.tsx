@@ -137,7 +137,7 @@ export const Profile: React.FC = () => {
 
       setPasswordSuccessMsg(res.message || 'Password saved successfully!');
       if (user) {
-        updateUser({ ...user, has_password: true });
+        updateUser({ ...user, has_password: true, auth_provider: 'LOCAL' });
       }
       setCurrentPassword('');
       setNewPassword('');

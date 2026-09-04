@@ -112,7 +112,11 @@ async def google_auth(payload: GoogleLoginRequest, db: AsyncSession = Depends(ge
             await db.refresh(user)
 
         access_token = create_access_token(data={"sub": user.email, "role": user.role.value})
-        return TokenResponse(access_token=access_token, user=UserResponse.model_validate(user))
+        return TokenResponse(
+            access_token=access_token,
+            user=UserResponse.model_validate(user),
+            requires_password_setup=(not user.has_password)
+        )
 
     # New user registering via Google
     count_query = await db.execute(select(func.count()).select_from(User))
@@ -125,7 +129,7 @@ async def google_auth(payload: GoogleLoginRequest, db: AsyncSession = Depends(ge
         profile_picture=google_data.get("picture"),
         password_hash=None,
         role=assigned_role,
-        auth_provider=AuthProvider.GOOGLE,
+        auth_provider=AuthProvider.LOCAL if payload.source == "firebase" else AuthProvider.GOOGLE,
         currency="$"
     )
     db.add(new_user)
@@ -133,7 +137,11 @@ async def google_auth(payload: GoogleLoginRequest, db: AsyncSession = Depends(ge
     await db.refresh(new_user)
 
     access_token = create_access_token(data={"sub": new_user.email, "role": new_user.role.value})
-    return TokenResponse(access_token=access_token, user=UserResponse.model_validate(new_user))
+    return TokenResponse(
+        access_token=access_token,
+        user=UserResponse.model_validate(new_user),
+        requires_password_setup=True
+    )
 
 @router.get("/me", response_model=UserResponse, summary="Get current logged in user profile")
 async def get_me(current_user: User = Depends(get_current_user)):
@@ -218,6 +226,7 @@ async def change_password(
         )
 
     user.password_hash = get_password_hash(payload.new_password)
+    user.auth_provider = AuthProvider.LOCAL  # Explicitly treated as local user
     await db.commit()
     invalidate_user_cache(user.email)
-    return {"status": "success", "message": "Password updated successfully."}
+    return {"status": "success", "message": "Password updated successfully. Account is now active for direct local login."}

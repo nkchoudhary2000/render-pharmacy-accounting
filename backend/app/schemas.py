@@ -17,12 +17,14 @@ class UserLogin(UserBase):
     password: str
 
 class GoogleLoginRequest(BaseModel):
-    credential: str = Field(..., description="Google ID Token (JWT) from Google Identity Services")
+    credential: str = Field(..., description="Google ID Token (JWT) or Firebase Auth Token")
+    source: Optional[str] = Field("web", description="Originating client application (e.g. 'firebase', 'web')")
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: "UserResponse"
+    requires_password_setup: bool = False
 
 class UserResponse(UserBase):
     id: int

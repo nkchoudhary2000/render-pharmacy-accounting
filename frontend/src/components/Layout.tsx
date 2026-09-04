@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
+import { SetPasswordModal } from './SetPasswordModal';
 
 export const Layout: React.FC = () => {
   return (
@@ -13,6 +14,7 @@ export const Layout: React.FC = () => {
           <Outlet />
         </main>
       </div>
+      <SetPasswordModal />
     </div>
   );
 };

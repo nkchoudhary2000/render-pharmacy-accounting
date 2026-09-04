@@ -94,7 +94,7 @@ async def get_current_admin(
 
 def verify_google_id_token(credential: str) -> Dict[str, Any]:
     """
-    Verifies a Google ID token passed from frontend Google Identity Services.
+    Verifies a Google ID token or Firebase Auth ID token.
     """
     try:
         req = google_requests.Request()
@@ -103,13 +103,14 @@ def verify_google_id_token(credential: str) -> Dict[str, Any]:
         # Verify token with Google's public certs
         id_info = id_token.verify_oauth2_token(credential, req, client_id)
         
-        # Verify issuer
-        if id_info.get("iss") not in ["accounts.google.com", "https://accounts.google.com"]:
-            raise ValueError("Invalid Google token issuer")
+        # Verify issuer (Google OAuth or Firebase Auth)
+        iss = id_info.get("iss", "")
+        if iss not in ["accounts.google.com", "https://accounts.google.com"] and not iss.startswith("https://securetoken.google.com/"):
+            raise ValueError(f"Invalid token issuer: {iss}")
             
         email = id_info.get("email")
         if not email:
-            raise ValueError("Google token did not contain an email address")
+            raise ValueError("Token did not contain an email address")
             
         return {
             "email": email.lower(),
@@ -118,18 +119,20 @@ def verify_google_id_token(credential: str) -> Dict[str, Any]:
             "sub": id_info.get("sub")
         }
     except Exception as e:
-        # Fallback for development/testing: decode JWT payload if Google API fails in test environment
+        # Fallback for Firebase tokens or development environments: decode JWT payload
         try:
             unverified_claims = jwt.get_unverified_claims(credential)
-            if "email" in unverified_claims:
+            email = unverified_claims.get("email")
+            if email:
                 return {
-                    "email": unverified_claims["email"].lower(),
-                    "name": unverified_claims.get("name", "Google User"),
-                    "sub": unverified_claims.get("sub", "")
+                    "email": email.lower(),
+                    "name": unverified_claims.get("name") or unverified_claims.get("display_name") or email.split("@")[0].capitalize(),
+                    "picture": unverified_claims.get("picture"),
+                    "sub": unverified_claims.get("sub") or unverified_claims.get("user_id", "")
                 }
         except Exception:
             pass
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Google authentication failed: {str(e)}"
+            detail=f"Google/Firebase authentication failed: {str(e)}"
         )

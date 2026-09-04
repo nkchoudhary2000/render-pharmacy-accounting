@@ -8,10 +8,12 @@ interface AuthContextType {
   isLoading: boolean;
   isAdmin: boolean;
   currency: string;
+  requiresPasswordSetup: boolean;
+  setRequiresPasswordSetup: (req: boolean) => void;
   updateUser: (updatedUser: User) => void;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
-  googleLogin: (credential: string) => Promise<void>;
+  googleLogin: (credential: string, source?: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -21,31 +23,68 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [requiresPasswordSetup, setRequiresPasswordSetup] = useState<boolean>(false);
 
   const handleAuthSuccess = (data: AuthResponse) => {
     localStorage.setItem('token', data.access_token);
     localStorage.setItem('user', JSON.stringify(data.user));
     setToken(data.access_token);
     setUser(data.user);
+    if (data.requires_password_setup || !data.user.has_password) {
+      setRequiresPasswordSetup(true);
+    }
   };
 
   useEffect(() => {
     const initAuth = async () => {
-      const storedToken = localStorage.getItem('token');
-      if (storedToken) {
-        try {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const incomingToken = urlParams.get('token') || urlParams.get('access_token');
+        const incomingCredential = urlParams.get('credential') || urlParams.get('google_credential');
+        const forcePasswordSetup =
+          urlParams.get('setup_password') === 'true' ||
+          urlParams.get('source') === 'firebase';
+
+        if (incomingCredential) {
+          const data = await authApi.googleLogin(incomingCredential, 'firebase');
+          handleAuthSuccess(data);
+          if (forcePasswordSetup || data.requires_password_setup || !data.user.has_password) {
+            setRequiresPasswordSetup(true);
+          }
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (incomingToken) {
+          localStorage.setItem('token', incomingToken);
+          setToken(incomingToken);
           const currentUser = await authApi.getMe();
           setUser(currentUser);
           localStorage.setItem('user', JSON.stringify(currentUser));
-        } catch (err) {
-          console.error('Failed to verify token', err);
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          setToken(null);
-          setUser(null);
+          if (forcePasswordSetup || !currentUser.has_password) {
+            setRequiresPasswordSetup(true);
+          }
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+          const storedToken = localStorage.getItem('token');
+          if (storedToken) {
+            const currentUser = await authApi.getMe();
+            setUser(currentUser);
+            localStorage.setItem('user', JSON.stringify(currentUser));
+            if (forcePasswordSetup || !currentUser.has_password) {
+              setRequiresPasswordSetup(true);
+            }
+            if (forcePasswordSetup) {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          }
         }
+      } catch (err) {
+        console.error('Failed to verify token or process external login', err);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setToken(null);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     initAuth();
@@ -61,9 +100,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     handleAuthSuccess(data);
   };
 
-  const googleLogin = async (credential: string) => {
-    const data = await authApi.googleLogin(credential);
+  const googleLogin = async (credential: string, source: string = 'web') => {
+    const data = await authApi.googleLogin(credential, source);
     handleAuthSuccess(data);
+    if (source === 'firebase' || data.requires_password_setup || !data.user.has_password) {
+      setRequiresPasswordSetup(true);
+    }
   };
 
   const updateUser = (updatedUser: User) => {
@@ -90,6 +132,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isLoading,
         isAdmin,
         currency,
+        requiresPasswordSetup,
+        setRequiresPasswordSetup,
         updateUser,
         login,
         register,
